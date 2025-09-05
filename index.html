@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Word Converter</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- pdf.js library for reading PDF files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <!-- docx library for creating Word documents -->
+    <script src="https://cdn.jsdelivr.net/npm/docx@7.3.0/build/index.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for the file input button */
+        .file-input-button {
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+        }
+        .file-input-button:hover {
+            background-color: #4338ca; /* Darker Indigo */
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white w-full max-w-lg mx-4 p-8 rounded-2xl shadow-lg text-center">
+        <!-- Header -->
+        <h1 class="text-3xl font-bold text-indigo-600 mb-2">PDF to Word Converter</h1>
+        <p class="text-gray-500 mb-6">Extract text from your PDF and download it as a Word document.</p>
+        
+        <!-- File Upload Section -->
+        <div id="uploadContainer" class="border-2 border-dashed border-gray-300 rounded-lg p-8 transition-all duration-300 hover:border-indigo-400 hover:bg-indigo-50">
+            <input type="file" id="pdfFile" class="hidden" accept=".pdf">
+            
+            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4V12a4 4 0 014-4h12l8 8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            
+            <label for="pdfFile" class="mt-4 inline-block bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg shadow-md file-input-button transition-all duration-300">
+                Choose PDF File
+            </label>
+            <p id="fileName" class="mt-2 text-sm text-gray-500">No file selected</p>
+        </div>
+
+        <!-- Convert Button -->
+        <button id="convertBtn" class="mt-6 w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5" disabled>
+            Convert to Word
+        </button>
+
+        <!-- Status & Download Section -->
+        <div id="statusContainer" class="mt-6 text-left hidden">
+            <div id="statusMessage" class="flex items-center p-4 mb-4 text-sm text-blue-700 bg-blue-100 rounded-lg" role="alert">
+                <svg class="w-5 h-5 inline mr-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                <span class="font-medium">Status:</span> Please wait, processing your file...
+            </div>
+            <a id="downloadLink" href="#" class="hidden w-full text-center bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-all duration-300 inline-block hover:shadow-lg hover:-translate-y-0.5">
+                Download Word File
+            </a>
+            <p class="mt-4 text-xs text-gray-400 text-center">Note: This tool extracts text content. Complex formatting, images, and tables may not be preserved perfectly.</p>
+        </div>
+
+    </div>
+
+    <script>
+        // Set the workerSrc for pdf.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+
+        // DOM Elements
+        const pdfFileInput = document.getElementById('pdfFile');
+        const fileNameDisplay = document.getElementById('fileName');
+        const convertBtn = document.getElementById('convertBtn');
+        const statusContainer = document.getElementById('statusContainer');
+        const statusMessage = document.getElementById('statusMessage');
+        const downloadLink = document.getElementById('downloadLink');
+
+        let selectedFile = null;
+
+        // Event listener for file input change
+        pdfFileInput.addEventListener('change', (event) => {
+            selectedFile = event.target.files[0];
+            if (selectedFile && selectedFile.type === 'application/pdf') {
+                fileNameDisplay.textContent = selectedFile.name;
+                convertBtn.disabled = false;
+                // Reset UI state
+                statusContainer.classList.add('hidden');
+                downloadLink.classList.add('hidden');
+            } else {
+                fileNameDisplay.textContent = 'Please select a valid PDF file.';
+                selectedFile = null;
+                convertBtn.disabled = true;
+            }
+        });
+        
+        // Event listener for convert button click
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            // Update UI to show processing state
+            convertBtn.disabled = true;
+            convertBtn.textContent = 'Converting...';
+            statusContainer.classList.remove('hidden');
+            statusMessage.innerHTML = `<svg class="w-5 h-5 inline mr-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> <span class="font-medium">Status:</span> Processing your file...`;
+            downloadLink.classList.add('hidden');
+
+            try {
+                const reader = new FileReader();
+                reader.readAsArrayBuffer(selectedFile);
+
+                reader.onload = async (event) => {
+                    const pdfData = new Uint8Array(event.target.result);
+                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                    let fullText = '';
+                    
+                    // Iterate through each page to extract text
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        fullText += pageText + '\n\n';
+                    }
+
+                    // Create a .docx file using the docx library
+                    const { Document, Packer, Paragraph, TextRun } = docx;
+
+                    const paragraphs = fullText.split('\n').map(text => new Paragraph({
+                        children: [new TextRun(text)],
+                    }));
+                    
+                    const doc = new Document({
+                        sections: [{
+                            properties: {},
+                            children: paragraphs,
+                        }],
+                    });
+
+                    // Generate blob and create download URL
+                    const blob = await Packer.toBlob(doc);
+                    const downloadUrl = URL.createObjectURL(blob);
+                    
+                    // Update UI to show success and download link
+                    downloadLink.href = downloadUrl;
+                    const originalFileName = selectedFile.name.replace(/\.pdf$/i, '');
+                    downloadLink.download = `${originalFileName}.docx`;
+                    downloadLink.classList.remove('hidden');
+                    
+                    statusMessage.innerHTML = `<svg class="w-5 h-5 inline mr-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg> <span class="font-medium">Success:</span> Your file is ready for download!`;
+                    statusMessage.classList.remove('bg-blue-100', 'text-blue-700');
+                    statusMessage.classList.add('bg-green-100', 'text-green-700');
+                };
+
+            } catch (error) {
+                console.error('Error during conversion:', error);
+                statusMessage.textContent = 'Error: Could not convert the file.';
+                statusMessage.classList.remove('bg-blue-100', 'text-blue-700');
+                statusMessage.classList.add('bg-red-100', 'text-red-700');
+            } finally {
+                convertBtn.textContent = 'Convert to Word';
+                convertBtn.disabled = false;
+            }
+        });
+    </script>
+
+</body>
+</html>
+
